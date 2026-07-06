@@ -1,0 +1,23 @@
+{
+  "air": 0,
+  "apa": 1,
+  "bagaimana": 2,
+  "belajar": 3,
+  "berangkat": 4,
+  "datang": 5,
+  "dimana": 6,
+  "kapan": 7,
+  "keluarga": 8,
+  "kenapa": 9,
+  "maaf": 10,
+  "makan": 11,
+  "malam": 12,
+  "pagi": 13,
+  "rumah": 14,
+  "saya": 15,
+  "siang": 16,
+  "siapa": 17,
+  "sore": 18,
+  "teman": 19,
+  "terima_kasih": 20
+}
