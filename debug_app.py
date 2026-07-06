@@ -1,48 +1,32 @@
 import streamlit as st
 st.write("Step 1: streamlit ok")
 
-import numpy as np
-st.write("Step 2: numpy ok")
-
-import cv2
-st.write("Step 3: cv2 ok")
-
 import mediapipe as mp
-st.write("Step 4: mediapipe ok, versi:", mp.__version__)
+st.write("Step 2: mediapipe ok, versi:", mp.__version__)
 
-import tensorflow as tf
-st.write("Step 5: tensorflow ok, versi:", tf.__version__)
+# Tes paling ringan dulu: mp.solutions.hands (bukan Holistic)
+mp_hands = mp.solutions.hands
+st.write("Step 3: mp_hands reference ok")
 
-model_cnn = tf.keras.models.load_model('models/model_cnn_abjad.keras', compile=False)
-st.write("Step 6: model CNN berhasil di-load")
+hands = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=2,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.5
+)
+st.write("Step 4: Hands() berhasil diinstansiasi")
 
-model_lstm = tf.keras.models.load_model('models/best_bisindo_lstm_4200dataset.keras', compile=False)
-st.write("Step 7: model LSTM berhasil di-load")
-
-import json
-with open('labels/label_abjad.json', 'r') as f:
-    la = json.load(f)
-with open('labels/label_map.json', 'r') as f:
-    lk = json.load(f)
-st.write("Step 8: labels berhasil di-load")
-
+# Kalau lolos, baru coba Holistic dengan model_complexity paling ringan
 mp_holistic = mp.solutions.holistic
-st.write("Step 9: mp_holistic.Holistic reference ok")
+st.write("Step 5: mp_holistic reference ok")
 
 holistic = mp_holistic.Holistic(
     min_detection_confidence=0.7,
     min_tracking_confidence=0.5,
-    model_complexity=1,
-    smooth_landmarks=True,
+    model_complexity=0,   # <-- diturunkan dari 1 ke 0 (paling ringan)
+    smooth_landmarks=False,
     enable_segmentation=False,
-    smooth_segmentation=False
+    smooth_segmentation=False,
+    refine_face_landmarks=False
 )
-st.write("Step 10: Holistic() berhasil diinstansiasi")
-
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-st.write("Step 11: streamlit_webrtc import ok")
-
-from av import VideoFrame
-st.write("Step 12: av import ok")
-
-st.write("SEMUA STEP LOLOS — tidak ada crash sampai di sini")
+st.write("Step 6: Holistic() berhasil diinstansiasi")
