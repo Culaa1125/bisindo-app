@@ -34,8 +34,8 @@ holistic = mp_holistic.Holistic(
     min_tracking_confidence=0.5,
     model_complexity=1,
     smooth_landmarks=True,
-    enable_segmentation=True,
-    smooth_segmentation=True
+    enable_segmentation=False,
+    smooth_segmentation=False
 )
 st.write("Step 10: Holistic() berhasil diinstansiasi")
 
