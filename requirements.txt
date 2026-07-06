@@ -1,3 +1,4 @@
+protobuf==4.25.3
 streamlit==1.32.0
 streamlit-webrtc==0.47.1
 mediapipe==0.10.21
