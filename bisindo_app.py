@@ -1,5 +1,7 @@
 import os
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import streamlit as st
 import cv2
@@ -7,9 +9,9 @@ import numpy as np
 import mediapipe as mp
 import tensorflow as tf
 import json
-import os
 import time
 import threading
+from threading import Lock
 from collections import deque
 from streamlit_webrtc import (webrtc_streamer,
                                VideoProcessorBase,
@@ -105,19 +107,22 @@ def get_rtc_configuration():
 RTC_CONFIGURATION = get_rtc_configuration()
 
 # ─────────────── LOAD MODEL ───────────────
-@st.cache_resource
+@st.cache_resource(show_spinner="Loading AI Models...")
 def load_models():
-    cnn  = tf.keras.models.load_model(
-               'models/model_cnn_abjad.keras',
-               compile=False)
+    cnn = tf.keras.models.load_model(
+        "models/model_cnn_abjad.keras",
+        compile=False,
+    )
     lstm = tf.keras.models.load_model(
-               'models/best_bisindo_lstm_4200dataset.keras',
-               compile=False)
-    print(f"CNN  : {cnn.input_shape} → {cnn.output_shape}")
-    print(f"LSTM : {lstm.input_shape} → {lstm.output_shape}")
-    return cnn, lstm
+        "models/best_bisindo_lstm_4200dataset.keras",
+        compile=False,
+    )
+    return {
+        "cnn": cnn,
+        "lstm": lstm,
+    }
 
-@st.cache_resource
+@st.cache_data
 def load_labels():
     with open('labels/label_abjad.json', 'r') as f:
         la = json.load(f)
@@ -128,7 +133,10 @@ def load_labels():
                                       key=lambda x: x[1])]
     return abjad, kosakata
 
-cnn_model, lstm_model = load_models()
+def get_models():
+    models = load_models()
+    return models["cnn"], models["lstm"]
+
 ABJAD, KOSAKATA       = load_labels()
 
 mp_holistic = mp.solutions.holistic
@@ -291,14 +299,7 @@ class MotionDetector:
 # dari main thread (di dalam main()) setelah widget sidebar dirender.
 class BISINDOProcessor(VideoProcessorBase):
     def __init__(self):
-        self.holistic = mp_holistic.Holistic(
-            min_detection_confidence=0.7,
-            min_tracking_confidence=0.5,
-            model_complexity=1,
-            smooth_landmarks=True,
-            enable_segmentation=True,
-            smooth_segmentation=True
-        )
+        self.holistic = None
         self._buf_cnn    = deque(maxlen=30)
         self._buf_lstm   = deque(maxlen=30)
         self._lock       = threading.Lock()
@@ -328,6 +329,25 @@ class BISINDOProcessor(VideoProcessorBase):
             target=self._predict_loop, daemon=True)
         self._pred_thread.start()
 
+    def get_holistic(self):
+    """
+    Lazy initialization MediaPipe Holistic.
+    Dibuat hanya sekali ketika kamera mulai mengirim frame.
+    """
+    if self.holistic is None:
+        self.holistic = mp.solutions.holistic.Holistic(
+            static_image_mode=False,
+            model_complexity=1,
+            smooth_landmarks=True,
+            enable_segmentation=False,
+            smooth_segmentation=False,
+            refine_face_landmarks=False,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.5,
+        )
+
+    return self.holistic
+    
     def update_settings(self, **kwargs):
         """Dipanggil dari MAIN THREAD untuk mengoper nilai
         st.session_state ke processor dengan aman."""
@@ -458,7 +478,12 @@ class BISINDOProcessor(VideoProcessorBase):
 
         rgb = cv2.cvtColor(proc_img, cv2.COLOR_BGR2RGB)
         rgb.flags.writeable = False
-        results = self.holistic.process(rgb)
+        holistic = self.get_holistic()
+        try:
+            with self.mp_lock:
+                results = holistic.process(rgb)
+        finally:
+            rgb.flags.writeable = True
         rgb.flags.writeable = True
 
         # Terapkan blur background (mask perlu di-resize dulu ke ukuran
@@ -571,8 +596,14 @@ class BISINDOProcessor(VideoProcessorBase):
         self._running = False
         self._new_data.set()
 
+    def cleanup(self):
+    if self.holistic is not None:
+        self.holistic.close()
+        self.holistic = None
+
 # ─────────────── MAIN UI ───────────────
 def main():
+    cnn_model, lstm_model = get_models()
     # ── Sidebar ──
     with st.sidebar:
         st.header("⚙️ Pengaturan")
@@ -837,4 +868,6 @@ def main():
         """)
 
 if __name__ == '__main__':
+    self.mp_lock = Lock()
     main()
+  
